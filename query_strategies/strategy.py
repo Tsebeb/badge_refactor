@@ -39,7 +39,7 @@ class Strategy:
             loss.backward()
 
             # clamp gradients, just in case
-            for p in filter(lambda p: p.grad is not None, self.clf.parameters()): p.grad.data.clamp_(min=-.1, max=.1)
+            # for p in filter(lambda p: p.grad is not None, self.net.parameters()): p.grad.data.clamp_(min=-.1, max=.1)
             optimizer.step()
 
         return accFinal / len(loader_tr.dataset.X), loss.item()
@@ -51,7 +51,7 @@ class Strategy:
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
-        if reset: self.clf =  self.net.apply(weight_reset).cuda()
+        self.clf = self.net
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
 
