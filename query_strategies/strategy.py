@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from copy import deepcopy
+from copy import deepcopy, copy
 import pdb
 import resnet
 from torch.distributions.categorical import Categorical
@@ -51,7 +51,7 @@ class Strategy:
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
-        self.clf = self.net.clone()
+        self.clf = deepcopy(self.net)
         self.clf.cuda()
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
