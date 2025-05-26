@@ -51,7 +51,8 @@ class Strategy:
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
-        self.clf = self.net
+        self.clf = self.net.clone()
+        self.clf.cuda()
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
 
