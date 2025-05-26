@@ -45,13 +45,12 @@ class Strategy:
         return accFinal / len(loader_tr.dataset.X), loss.item()
 
  
-    def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[]):
+    def train(self, reset=False, optimizer=0, verbose=True, data=[], net=[]):
         def weight_reset(m):
             newLayer = deepcopy(m)
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
-        n_epoch = self.args['n_epoch']
         if reset: self.clf =  self.net.apply(weight_reset).cuda()
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
@@ -62,26 +61,10 @@ class Strategy:
             loader_tr = DataLoader(self.handler(data[0], torch.Tensor(data[1]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
 
         epoch = 1
-        accCurrent = 0.
-        bestAcc = 0.
         attempts = 0
-        while accCurrent < 0.99: 
+        for i in range(100):
             accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
-            if bestAcc < accCurrent:
-                bestAcc = accCurrent
-                attempts = 0
-            else: attempts += 1
-            epoch += 1
-            if verbose: print(str(epoch) + ' ' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
-            # reset if not converging
-            if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
-                self.clf = self.net.apply(weight_reset)
-                optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
-            if attempts >= 50 and self.args['modelType'] == 'linear': break 
-            #if attempts >= 50 and self.args['modelType'] != 'linear' and len(idxs_train) > 1000:
-            #    self.clf = self.net.apply(weight_reset)
-            #    optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
-            #    attempts = 0
+            if verbose: print("Train Epoch: " + str(i) + ' ' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
 
 
     def train_val(self, valFrac=0.1, opt='adam', verbose=False):

@@ -1,3 +1,5 @@
+import datetime
+
 import numpy as np
 import sys
 import gc
@@ -7,6 +9,7 @@ import pickle
 import os
 import argparse
 from dataset import get_dataset, get_handler
+from file_output_duplicator import FileOutputDuplicator
 from model import get_net
 import vgg
 import resnet
@@ -18,6 +21,7 @@ import torch
 import time
 import pdb
 from scipy.stats import zscore
+import random
 
 from query_strategies import RandomSampling, BadgeSampling, \
                                 BaselineSampling, LeastConfidence, MarginSampling, \
@@ -45,6 +49,14 @@ parser.add_argument('--dummy', help='dummy input for indexing replicates', type=
 opts = parser.parse_args()
 print(opts, flush=True)
 
+
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
 # parameters
 NUM_INIT_LB = opts.nStart
 NUM_QUERY = opts.nQuery
@@ -54,6 +66,10 @@ DATA_NAME = opts.data
 # regularization settings for bait
 opts.lamb = 1
 if 'CIFAR' in opts.data: opts.lamb = 1e-2
+
+date_str = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+sys.stdout = FileOutputDuplicator(sys.stdout, f'{date_str}_stdout.txt', 'w')
+sys.stderr = FileOutputDuplicator(sys.stderr, f'{date_str}_stderr.txt', 'w')
 
 # non-openml data defaults
 args_pool = {'MNIST':
@@ -163,10 +179,11 @@ print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
 
 # generate initial labeled pool
+seed_everything(42)
 idxs_lb = np.zeros(n_pool, dtype=bool)
-idxs_tmp = np.arange(n_pool)
-np.random.shuffle(idxs_tmp)
-idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
+indices = np.arange(n_pool)
+selected_indices = np.random.choice(indices, NUM_INIT_LB, replace=False)
+idxs_lb[selected_indices] = True
 
 # linear model class
 class linMod(nn.Module):
@@ -200,6 +217,7 @@ class mlpMod(nn.Module):
         return self.embSize
 
 # load specified network
+seed_everything(42)
 if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
 elif opts.model == 'resnet':
@@ -212,6 +230,8 @@ elif opts.model == 'lin':
 else: 
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
+initial_state_dict = net.state_dict()
+
 
 if opts.did > 0 and opts.model != 'mlp':
     print('openML datasets only work with mlp', flush=True)
@@ -253,14 +273,18 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 
 # round 0 accuracy
-strategy.train()
+seed_everything(42)
+net.load_state_dict(initial_state_dict)
+strategy.train(reset=False)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND+1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 
 for rd in range(1, NUM_ROUND+1):
+    print("=" * 80)
     print('Round {}'.format(rd), flush=True)
+    print("=" * 80)
     torch.cuda.empty_cache()
     gc.collect()
     torch.cuda.empty_cache()
@@ -273,7 +297,8 @@ for rd in range(1, NUM_ROUND+1):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=False)
+    net.load_state_dict(initial_state_dict)
+    strategy.train(verbose=True, reset=False)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)
@@ -282,3 +307,10 @@ for rd in range(1, NUM_ROUND+1):
     if sum(~strategy.idxs_lb) < opts.nQuery: break
     if opts.rounds > 0 and rd == (opts.rounds - 1): break
 
+print("="*80)
+print("FINAL ACCURACY PROGRESSION")
+print(acc, flush=True)
+print("="*80)
+
+np.save(acc, f"{date_str}_{opts.alg}_acc.npy")
+sys.exit()
