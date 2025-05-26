@@ -284,6 +284,8 @@ print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 for rd in range(1, NUM_ROUND+1):
     print("=" * 80)
     print('Round {}'.format(rd), flush=True)
+    print("Number of Labelled samples: {}".format(sum(strategy.idxs_lb)), flush=True)
+    print("Number of Unlabelled samples: {}".format(sum(~strategy.idxs_lb)), flush=True)
     print("=" * 80)
     torch.cuda.empty_cache()
     gc.collect()
