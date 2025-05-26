@@ -312,5 +312,5 @@ print("FINAL ACCURACY PROGRESSION")
 print(acc, flush=True)
 print("="*80)
 
-np.save(acc, f"{date_str}_{opts.alg}_acc.npy")
+np.save(f"{date_str}_{opts.alg}_acc.npy", acc)
 sys.exit()

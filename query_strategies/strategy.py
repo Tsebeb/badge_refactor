@@ -54,7 +54,7 @@ class Strategy:
         self.clf = deepcopy(self.net)
         self.clf.cuda()
         if type(net) != list: self.clf = net
-        if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
+        if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'])
 
         idxs_train = np.arange(self.n_pool)[self.idxs_lb]
         loader_tr = DataLoader(self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
